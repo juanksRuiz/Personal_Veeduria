@@ -1,0 +1,13 @@
+QUE NECESITO:
+- Las funciones para login en .py
+	- iniciar la aplicacion
+	- CLASE Usuario y funciones asociadas
+	- login_required
+	- generar contraseña aleatoria
+	- Enviar correo
+	- render_main_windows (renderizar html segun su usuario)
+	- Login Window
+- El template html (css) para pagina inicial, recuperar contraseña y crear nueva contraseña
+- Una base de datos prueba de usuarios de aplicacion
+
+Por ahora, concentrarse en la autenticacion de admin

@@ -1,15 +1,98 @@
 # -*- coding: utf-8 -*-
 
-# Archivo principal para poder arrancar la aplicación
-from flask import Flask, url_for, request, render_template
+# Standard library imports
+from random import choice
+from functools import wraps
+
+# Third party imports
+from flask import flash, Flask, redirect, render_template, request, url_for
 from markupsafe import escape
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import flask_login
+import psycopg2
+import secrets
 
+
+# Constantes globales
+ROLES = ["administrador","veedor"]
+
+#Variables globales
 app = Flask(__name__)
+conn = None
+cur = None
+login_manager = flask_login.LoginManager()
 
-# Para emepzar a ejecutar servidor
 
-# decorador
-# cada vez que se entre a la parte principal de la app se hace la siguiente accion
+def init_app():
+    global app
+    global conn
+    global cur
+    global login_manager
+
+    # Connection to Database
+    conn = psycopg2.connect(
+        user="postgres",
+        password="123",
+        host="localhost",
+        port="5432",
+        database="epsilon",
+        )
+
+    conn.set_session(autocommit=True)
+    cur = conn.cursor()
+    app.secret_key = secrets.token_bytes(nbytes=16)
+    login_manager.init_app(app)
+
+app.before_first_request(init_app)
+
+
+class Usuario(flask_login.UserMixin):
+    def __init__(self, usuario_id, usuario_rol):
+        self.id = usuario_id
+        self.urol = usuario_rol
+    
+    def get_urol(self):
+        return self.urol
+
+@login_manager.user_loader
+def load_user(user_id):
+    """
+    Carga una instancia de usuario a partir de su nombre de usuario.
+    PARAMETROS:
+        user_id: nombre de usuario
+    RETORNA:
+        instancia de un usuario
+    """
+    try:
+        cur.execute("SELECT usuario FROM personas WHERE usuario=%s", (user_id,))
+        cur.execute("SELECT tipo FROM personas WHERE usuario=%s", (user_id,))
+        user_type = str(cur.fetchone()[0])
+        return Usuario(user_id, user_type)
+    except Exception:
+        return None
+
+def login_required(role="ANY"):
+    def wrapper(fn):
+        """
+        Determina si el rol de un usuario permite o no acceder
+        a la función donde se encuentra este wrapper.
+        PARAMETROS:
+            role: rol que requiere la función
+        RETORNA:
+            wrapper: wrapper dependiendo del rol
+        """
+        @wraps(fn)
+        def decorated_view(*args, **kwargs):
+            if not flask_login.current_user.is_authenticated:
+                return app.login_manager.unauthorized()
+            urole = flask_login.current_user.get_urole()
+            if role != "ANY" and ROLES.index(urole) < ROLES.index(role):
+                return app.login_manager.unauthorized()
+            return fn(*args, **kwargs)
+        return decorated_view
+    return wrapper
+#--------------------------------------
 @app.route('/')
 def Index():
     return "Hello world"
