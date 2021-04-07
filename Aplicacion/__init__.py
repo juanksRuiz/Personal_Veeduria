@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+import os
+from flask import Flask
+
+# -*- coding: utf-8 -*-
 
 # Standard library imports
 from random import choice
@@ -12,7 +16,7 @@ from email.mime.multipart import MIMEMultipart
 import flask_login
 import psycopg2
 import secrets
-
+import smtplib
 
 # Constantes globales
 ROLES = ["administrador","veedor"]
@@ -21,6 +25,7 @@ ROLES = ["administrador","veedor"]
 app = Flask(__name__)
 conn = None
 cur = None
+# user session management
 login_manager = flask_login.LoginManager()
 
 
@@ -30,30 +35,28 @@ def init_app():
     global cur
     global login_manager
 
-    # Connection to Database
+    # Connection to Database using pgadmin
     conn = psycopg2.connect(
         user="postgres",
-        password="123",
+        password="postgres",
         host="localhost",
         port="5432",
-        database="epsilon",
-        )
-
+        dbname="Datos_Veeduria"
+    )
     conn.set_session(autocommit=True)
     cur = conn.cursor()
+    # configuracion de seguridad
     app.secret_key = secrets.token_bytes(nbytes=16)
+    # inicia app
     login_manager.init_app(app)
 
-app.before_first_request(init_app)
-
-
 class Usuario(flask_login.UserMixin):
-    def __init__(self, usuario_id, usuario_rol):
+    def __init__(self, usuario_id, usuario_tipo):
         self.id = usuario_id
-        self.urol = usuario_rol
+        self.u_tipo = usuario_tipo
     
-    def get_urol(self):
-        return self.urol
+    def get_usuario_tipo(self):
+        return self.u_tipo
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -92,71 +95,36 @@ def login_required(role="ANY"):
             return fn(*args, **kwargs)
         return decorated_view
     return wrapper
-#--------------------------------------
-@app.route('/')
-def Index():
-    return "Hello world"
+
+def generate_passwd():
+    """
+    Genera contraseña aleatoria para los usuarios que olvidan su contraseña
+    RETORNA:
+        passwd: contraseña aleatoria
+    """
+    longitud = 8
+    valores = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ<=>@#%&+"
+    passwd = "".join([choice(valores) for i in range(longitud)])
+    return passwd
+
+def send_email(username, email, codigo):
+    """
+    Envía un correo a un usuario determinado con una contraseña temporal para el
+    inicio de sesión
+    PARAMETROS:
+         username: nombre de usuario
+        email: correo del usuario
+        código: código del usuario que corresponde a la contraseña temporal
+    """
+    sender_email = "EpsilonAppUR@gmail.com"
+    receiver_email = email
+    password = "macc123*"
+#app.before_first_request(init_app)
+@app.route("/")
+def main():
+    return "Lo lograste"
 
 
-@app.route("/add_contact")
-def add_contact():
-    return "add contact"
-
-@app.route("/edit")
-def edit_contact():
-    return "edit contact"
-
-@app.route("/delete")
-def delete_contact():
-    return "borrar contacto"
-
-# Cuando recibe argumentos
-@app.route("/user/<username>")
-def show_user_profile(username):
-    # show the user profile or that user
-    return "User %s" % escape(username)
-
-# Especificando el tipo
-@app.route("/post/<int:post_id>")
-def show_post(post_id):
-    return 'Post %d' % post_id
-
-
-@app.route("/user/<username>")
-def profile(username):
-    return "{}\'s profile".format(escape(username))
-
-# Especificando metodos de HTML para acceder a info
-# por defecto solo reconoce GET
-"""
-@app.route('/login', methods=["GET","POST"])
-def login():
-    if request.method == "POST":
-        return do_the_login()
-    else:
-        return show_the_login_form()
-"""
-#@app.route("/hello/")
-#@app.route("/hello/<name>")
-#def hello(name=None):
-#    return render_template("hello.html", name=name)
-
-@app.route("/home")
-def home():
-    return render_template("home.html")
-
-# imprime url para una funcion
-"""
-with app.test_request_context():
-    print(url_for("Index"))
-    #print(url_for('login'))
-    #print(url_for('login', next='/'))
-    print(url_for('profile', username='John Doe'))
-"""    
-    
 if __name__ == '__main__':
     # debug es para que en caso de hacer cambios en codigo que el servidor se actualice
     app.run(host="127.0.0.1",port = 3000,debug = True)
-    
-    
-    
